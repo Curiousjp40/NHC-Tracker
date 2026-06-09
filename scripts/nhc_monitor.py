@@ -43,8 +43,36 @@ if first_run:
     print("First run — seeded seen entries. Will email on next new advisory.")
     exit(0)
 
+# Only keep entries matching notification triggers
+TRIGGER_KEYWORDS = [
+    # Initial — storm named or watches/warnings
+    "tropical storm", "hurricane", "typhoon", "subtropical storm",
+    "watch", "warning",
+    # Updates
+    "upgrade", "downgrade", "landfall", "weakens", "dissipat", "remnant",
+    # Preparedness
+    "state of emergency", "evacuation", "airport closure",
+    # Final
+    "discontinu", "advisory number",
+]
+
+SKIP_KEYWORDS = [
+    "tropical weather outlook",
+    "no tropical cyclones",
+    "formation not expected",
+    "disturbance",
+]
+
+def is_relevant(entry):
+    text = (entry["title"] + " " + entry["summary"]).lower()
+    if any(skip in text for skip in SKIP_KEYWORDS):
+        return False
+    return any(trigger in text for trigger in TRIGGER_KEYWORDS)
+
+new_entries = [e for e in new_entries if is_relevant(e)]
+
 if not new_entries:
-    print("No new advisories.")
+    print("No relevant storm advisories.")
     exit(0)
 
 subject = f"🌀 NHC Alert: {len(new_entries)} New Advisory{'s' if len(new_entries) > 1 else ''}"
