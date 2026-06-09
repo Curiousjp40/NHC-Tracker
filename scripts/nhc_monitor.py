@@ -258,11 +258,16 @@ for name, s in storms.items():
 new_rows = ""
 for e in new_entries:
     new_rows += f"""
-    <tr><td colspan="2" style="padding:10px 12px;background:#1a3a5c;color:white;font-weight:bold;">{e['feed']}</td></tr>
-    <tr><td style="padding:6px 12px;font-weight:bold;color:#555;width:110px;font-size:13px;">Advisory</td><td style="padding:6px 12px;font-size:13px;">{e['title']}</td></tr>
-    <tr style="background:#f9f9f9;"><td style="padding:6px 12px;font-weight:bold;color:#555;font-size:13px;">Published</td><td style="padding:6px 12px;font-size:13px;">{to_et(e['published'])}</td></tr>
-    <tr><td style="padding:6px 12px;font-weight:bold;color:#555;font-size:13px;vertical-align:top;">Summary</td><td style="padding:6px 12px;font-size:13px;border-left:3px solid #1a3a5c;background:#f0f4f8;">{e['summary'][:400]}</td></tr>
-    <tr><td colspan="2" style="padding:8px 16px;text-align:right;"><a href="{e['link']}" style="background:#1a3a5c;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold;">View Full Advisory →</a></td></tr>
+    <tr><td colspan="2" style="padding:10px 12px;background:#1a5276;color:white;font-weight:bold;">{e['feed']}</td></tr>
+    <tr><td style="padding:6px 12px;font-weight:bold;width:110px;">Advisory</td>
+      <td style="padding:6px 12px;">
+        <span style="background:#e74c3c;color:white;font-size:11px;font-weight:bold;padding:2px 6px;border-radius:3px;margin-right:6px;">&#x1F195; NEW</span>
+        {e['title']}
+      </td>
+    </tr>
+    <tr style="background:#f2f3f4;"><td style="padding:6px 12px;font-weight:bold;">Published</td><td style="padding:6px 12px;">{to_et(e['published'])}</td></tr>
+    <tr><td style="padding:6px 12px;font-weight:bold;vertical-align:top;">Summary</td><td style="padding:6px 12px;background:#eaf4fb;border-left:4px solid #1a5276;">{e['summary'][:400]}</td></tr>
+    <tr><td></td><td style="padding:6px 12px;"><a href="{e['link']}" style="color:#1a5276;">View full advisory &#x2192;</a></td></tr>
     """
 
 subject = f"🌀 NHC Alert: {len(new_entries)} New Advisory{'s' if len(new_entries) > 1 else ''}"
