@@ -10,6 +10,18 @@ import urllib.parse
 import feedparser
 from pathlib import Path
 
+# TEST MODE — sends a fake advisory email to verify everything works
+TEST_MODE = os.environ.get("TEST_MODE", "false").lower() == "true"
+
+if TEST_MODE:
+    new_entries = [{
+        "feed":      "Atlantic Basin",
+        "title":     "TEST - Tropical Storm Test One Advisory #1",
+        "summary":   "This is a test email from your NHC Tracker. If you received this, everything is working correctly.",
+        "link":      "https://www.nhc.noaa.gov",
+        "published": "Test Run",
+    }]
+
 FEEDS = {
     "Atlantic Basin":       "https://www.nhc.noaa.gov/index-at.xml",
     "Eastern Pacific":      "https://www.nhc.noaa.gov/index-ep.xml",
@@ -23,28 +35,29 @@ api_key    = os.environ["SENDGRID_API_KEY"]
 from_email = os.environ["SMTP_USER"]
 to_email   = os.environ["TO_EMAIL"]
 
-if SEEN_FILE.exists():
-    seen = set(json.loads(SEEN_FILE.read_text()))
-else:
-    seen = set()
+if not TEST_MODE:
+    if SEEN_FILE.exists():
+        seen = set(json.loads(SEEN_FILE.read_text()))
+    else:
+        seen = set()
 
-new_entries = []
+    new_entries = []
 
-for feed_name, url in FEEDS.items():
-    feed = feedparser.parse(url)
-    for entry in feed.entries:
-        entry_id = entry.get("id") or entry.get("link") or entry.get("title")
-        if entry_id and entry_id not in seen:
-            new_entries.append({
-                "feed":      feed_name,
-                "title":     entry.get("title", "No title"),
-                "summary":   entry.get("summary", ""),
-                "link":      entry.get("link", ""),
-                "published": entry.get("published", ""),
-            })
-            seen.add(entry_id)
+    for feed_name, url in FEEDS.items():
+        feed = feedparser.parse(url)
+        for entry in feed.entries:
+            entry_id = entry.get("id") or entry.get("link") or entry.get("title")
+            if entry_id and entry_id not in seen:
+                new_entries.append({
+                    "feed":      feed_name,
+                    "title":     entry.get("title", "No title"),
+                    "summary":   entry.get("summary", ""),
+                    "link":      entry.get("link", ""),
+                    "published": entry.get("published", ""),
+                })
+                seen.add(entry_id)
 
-SEEN_FILE.write_text(json.dumps(list(seen)))
+    SEEN_FILE.write_text(json.dumps(list(seen)))
 
 if not new_entries:
     print("No new NHC advisories.")
