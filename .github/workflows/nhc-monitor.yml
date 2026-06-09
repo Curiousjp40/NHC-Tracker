@@ -26,5 +26,4 @@ jobs:
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           TO_EMAIL: ryan.pohlman@simon.com
-          TEST_MODE: "true"
         run: python scripts/nhc_monitor.py

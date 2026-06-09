@@ -1,26 +1,8 @@
-"""
-nhc_monitor.py
-Polls NHC RSS feeds and emails ryan.pohlman@simon.com on new advisories via SendGrid.
-"""
-
 import os
 import json
 import urllib.request
-import urllib.parse
 import feedparser
 from pathlib import Path
-
-# TEST MODE — sends a fake advisory email to verify everything works
-TEST_MODE = os.environ.get("TEST_MODE", "false").lower() == "true"
-
-if TEST_MODE:
-    new_entries = [{
-        "feed":      "Atlantic Basin",
-        "title":     "TEST - Tropical Storm Test One Advisory #1",
-        "summary":   "This is a test email from your NHC Tracker. If you received this, everything is working correctly.",
-        "link":      "https://www.nhc.noaa.gov",
-        "published": "Test Run",
-    }]
 
 FEEDS = {
     "Atlantic Basin":  "https://www.nhc.noaa.gov/index-at.xml",
@@ -33,42 +15,36 @@ api_key    = os.environ["SENDGRID_API_KEY"]
 from_email = os.environ["SMTP_USER"]
 to_email   = os.environ["TO_EMAIL"]
 
-if not TEST_MODE:
-    if SEEN_FILE.exists():
-        seen = set(json.loads(SEEN_FILE.read_text()))
-    else:
-        seen = set()
+# Load seen entries
+seen = set(json.loads(SEEN_FILE.read_text())) if SEEN_FILE.exists() else set()
+first_run = not SEEN_FILE.exists()
 
-    new_entries = []
+new_entries = []
 
-    for feed_name, url in FEEDS.items():
-        feed = feedparser.parse(url)
-        for entry in feed.entries:
-            entry_id = entry.get("id") or entry.get("link") or entry.get("title")
-            if entry_id and entry_id not in seen:
-                new_entries.append({
-                    "feed":      feed_name,
-                    "title":     entry.get("title", "No title"),
-                    "summary":   entry.get("summary", ""),
-                    "link":      entry.get("link", ""),
-                    "published": entry.get("published", ""),
-                })
-                seen.add(entry_id)
+for feed_name, url in FEEDS.items():
+    feed = feedparser.parse(url)
+    for entry in feed.entries:
+        entry_id = entry.get("id") or entry.get("link") or entry.get("title")
+        if entry_id and entry_id not in seen:
+            new_entries.append({
+                "feed":      feed_name,
+                "title":     entry.get("title", "No title"),
+                "summary":   entry.get("summary", ""),
+                "link":      entry.get("link", ""),
+                "published": entry.get("published", ""),
+            })
+            seen.add(entry_id)
 
-    SEEN_FILE.write_text(json.dumps(list(seen)))
+# Always save seen entries
+SEEN_FILE.write_text(json.dumps(list(seen)))
 
-# Filter out routine outlook entries — only keep actual storm advisories
-new_entries = [
-    e for e in new_entries
-    if not any(skip in e["title"].lower() for skip in [
-        "tropical weather outlook",
-        "no tropical cyclones",
-        "formation not expected",
-    ])
-]
+# On first run just seed — don't email
+if first_run:
+    print("First run — seeded seen entries. Will email on next new advisory.")
+    exit(0)
 
 if not new_entries:
-    print("No new storm advisories.")
+    print("No new advisories.")
     exit(0)
 
 subject = f"🌀 NHC Alert: {len(new_entries)} New Advisory{'s' if len(new_entries) > 1 else ''}"
