@@ -23,7 +23,7 @@ jobs:
 
       - name: Check NHC feeds and notify
         env:
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
           TO_EMAIL: ryan.pohlman@simon.com
         run: python scripts/nhc_monitor.py
