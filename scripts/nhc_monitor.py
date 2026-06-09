@@ -89,8 +89,7 @@ def get_storm_status(entries):
     storms = {}
     for e in entries:
         title = e["title"]
-        summary = e["summary"].lower()
-        text = (title + " " + summary).lower()
+        text = (title + " " + e["summary"]).lower()
         if any(skip in text for skip in SKIP_KEYWORDS):
             continue
         if not any(t in text for t in ["tropical storm", "hurricane", "typhoon", "subtropical storm", "advisory"]):
@@ -100,8 +99,10 @@ def get_storm_status(entries):
             name = match.group(1).capitalize()
         elif "summary for" in title.lower():
             match2 = re.search(r'summary for (.+?)\s*\(', title, re.IGNORECASE)
-            name = match2.group(1).strip() if match2 else title
+            name = match2.group(1).strip() if match2 else None
         else:
+            continue
+        if not name:
             continue
         if name not in storms:
             storms[name] = {
@@ -115,22 +116,22 @@ def get_storm_status(entries):
                 "warnings": [],
                 "status_flags": [],
             }
-        if "hurricane warning" in text:
-            storms[name]["warnings"].append("Hurricane Warning")
-        if "tropical storm warning" in text:
+        if "...tropical storm warning in effect" in text or "tropical storm warning is in effect" in text:
             storms[name]["warnings"].append("Tropical Storm Warning")
-        if "hurricane watch" in text:
-            storms[name]["watches"].append("Hurricane Watch")
-        if "tropical storm watch" in text:
+        if "...hurricane warning in effect" in text or "hurricane warning is in effect" in text:
+            storms[name]["warnings"].append("Hurricane Warning")
+        if "...tropical storm watch in effect" in text or "tropical storm watch is in effect" in text:
             storms[name]["watches"].append("Tropical Storm Watch")
-        if "landfall" in text:
-            storms[name]["status_flags"].append("Landfall occurred")
-        if any(w in text for w in ["dissipat", "remnant", "weakening"]):
-            storms[name]["status_flags"].append("Weakening/dissipating")
-        if any(w in text for w in ["strengthen", "intensif"]):
-            storms[name]["status_flags"].append("Strengthening")
-        if "discontinu" in text:
-            storms[name]["status_flags"].append("NHC discontinuing advisories")
+        if "...hurricane watch in effect" in text or "hurricane watch is in effect" in text:
+            storms[name]["watches"].append("Hurricane Watch")
+        if "made landfall" in text or "center made landfall" in text:
+            storms[name]["status_flags"].append("✅ Landfall confirmed by NHC")
+        if "discontinu" in text and "advisory" in text:
+            storms[name]["status_flags"].append("🏁 NHC discontinuing advisories")
+        if "is forecast to strengthen" in text or "expected to intensify" in text:
+            storms[name]["status_flags"].append("📈 Strengthening forecast")
+        if "is forecast to weaken" in text or "expected to weaken" in text:
+            storms[name]["status_flags"].append("📉 Weakening forecast")
     return storms
 
 storms = get_storm_status(all_entries)
