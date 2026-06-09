@@ -72,6 +72,8 @@ SKIP_KEYWORDS = [
     "no tropical cyclones",
     "formation not expected",
     "disturbance",
+    "there are no tropical",
+    "not expected during the next",
 ]
 
 def is_relevant(entry):
