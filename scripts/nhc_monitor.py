@@ -158,148 +158,242 @@ def get_storm_status(entries):
 
 storms = get_storm_status(all_entries)
 
+# Determine severity level across all new entries
+all_new_text = " ".join((e["title"] + " " + e["summary"]).lower() for e in new_entries)
+has_hurricane_warning = "hurricane warning" in all_new_text
+has_hurricane_watch   = "hurricane watch" in all_new_text
+has_ts_warning        = "tropical storm warning" in all_new_text
+has_ts_watch          = "tropical storm watch" in all_new_text or "watch" in all_new_text
+
+storm_names = list(storms.keys()) if storms else []
+storm_name_str = ", ".join(storm_names) if storm_names else f"{len(new_entries)} update(s)"
+
+if has_hurricane_warning or has_hurricane_watch:
+    severity = "hurricane"
+elif has_ts_warning or has_ts_watch:
+    severity = "tropical_storm"
+else:
+    severity = "default"
+
+# Subject line
+if severity == "hurricane":
+    subject = f"URGENT - NHC HURRICANE ALERT: {storm_name_str}"
+elif severity == "tropical_storm":
+    subject = f"NHC TROPICAL STORM ALERT: {storm_name_str}"
+else:
+    subject = f"NHC Advisory Update: {storm_name_str}"
+
+# Header banner config
+if severity == "hurricane":
+    banner_bg    = "#8B0000"
+    banner_emoji = "HURRICANE ALERT — IMMEDIATE ATTENTION REQUIRED"
+    banner_label = "URGENT ALERT"
+elif severity == "tropical_storm":
+    banner_bg    = "#E65100"
+    banner_emoji = "TROPICAL STORM ADVISORY ALERT"
+    banner_label = "ADVISORY ALERT"
+else:
+    banner_bg    = "#1a5276"
+    banner_emoji = "NHC ADVISORY UPDATE"
+    banner_label = "ADVISORY UPDATE"
+
 now_et = datetime.datetime.now(ZoneInfo("America/New_York"))
 now_suffix = "EDT" if now_et.dst() else "EST"
 now_str = now_et.strftime(f"%b %d, %Y %I:%M %p {now_suffix}")
 
+# Top alert box content
+alert_lines = []
+for name, s in storms.items():
+    watches  = list(dict.fromkeys(s["watches"]))
+    warnings = list(dict.fromkeys(s["warnings"]))
+    parts = [f"<strong>{name}</strong>"]
+    if warnings:
+        parts.append(", ".join(warnings))
+    if watches:
+        parts.append(", ".join(watches))
+    alert_lines.append(" — ".join(parts))
+
+alert_box_rows = "".join(
+    f'<div style="margin:4px 0;font-size:15px;color:white;">{line}</div>'
+    for line in alert_lines
+) if alert_lines else '<div style="font-size:15px;color:white;">See advisory details below.</div>'
+
+# Storm cards
 storm_blocks = ""
 for name, s in storms.items():
     watches  = list(dict.fromkeys(s["watches"]))
     warnings = list(dict.fromkeys(s["warnings"]))
     flags    = list(dict.fromkeys(s["status_flags"]))
 
-    wind  = extract_wind_speed(s["latest_summary"])
-    loc   = extract_location(s["latest_summary"])
+    wind = extract_wind_speed(s["latest_summary"])
+    loc  = extract_location(s["latest_summary"])
 
-    # Card border color
     if warnings:
-        border_color = "#c0392b"
+        border_color = "#8B0000"
     elif watches:
-        border_color = "#e67e22"
+        border_color = "#E65100"
     else:
         border_color = "#7f8c8d"
 
-    # Watches/warnings HTML
-    def alert_pills(items, bg, color):
-        if not items:
-            return '<span style="color:#888;font-size:13px;">None</span>'
-        return "".join(
-            f'<span style="background:{bg};color:{color};padding:3px 8px;border-radius:3px;font-size:13px;margin-right:4px;">{i}</span>'
-            for i in items
+    if warnings:
+        warning_pills = "".join(
+            '<span style="background:#fde8e8;color:#8B0000;padding:4px 10px;border-radius:3px;'
+            'font-size:13px;font-weight:bold;margin-right:4px;">' + w + '</span>'
+            for w in warnings
         )
+    else:
+        warning_pills = '<span style="color:#888;font-size:13px;">None</span>'
 
-    warning_html = alert_pills(warnings, "#fde8e8", "#c0392b")
-    watch_html   = alert_pills(watches,  "#fff3e0", "#e67e22")
+    if watches:
+        watch_pills = "".join(
+            '<span style="background:#fff3e0;color:#E65100;padding:4px 10px;border-radius:3px;'
+            'font-size:13px;font-weight:bold;margin-right:4px;">' + w + '</span>'
+            for w in watches
+        )
+    else:
+        watch_pills = '<span style="color:#888;font-size:13px;">None</span>'
 
     if flags:
         flag_html = "".join(
-            f'<div style="background:#e8f5e9;color:#2e7d32;padding:4px 8px;border-radius:3px;font-size:13px;margin-bottom:3px;">{f}</div>'
+            '<div style="background:#e8f5e9;color:#2e7d32;padding:4px 8px;border-radius:3px;'
+            'font-size:13px;margin-bottom:3px;">' + f + '</div>'
             for f in flags
         )
     else:
         flag_html = '<span style="color:#888;font-size:13px;">No significant status changes</span>'
 
-    wind_row = f"""
-        <tr>
-          <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Wind Speed</td>
-          <td style="padding:5px 10px;font-size:13px;">{wind}</td>
-        </tr>""" if wind else ""
+    wind_row = (
+        '<tr><td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Wind Speed</td>'
+        '<td style="padding:5px 10px;font-size:13px;">' + wind + '</td></tr>'
+    ) if wind else ""
 
-    loc_row = f"""
-        <tr style="background:#f9f9f9;">
-          <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Location</td>
-          <td style="padding:5px 10px;font-size:13px;">{loc}</td>
-        </tr>""" if loc else ""
+    loc_row = (
+        '<tr style="background:#f9f9f9;"><td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Location</td>'
+        '<td style="padding:5px 10px;font-size:13px;">' + loc + '</td></tr>'
+    ) if loc else ""
 
-    storm_blocks += f"""
-    <div style="border-left:5px solid {border_color};border-radius:6px;margin-bottom:18px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
-      <div style="background:#1a3a5c;padding:12px 16px;">
-        <span style="color:white;font-size:16px;font-weight:bold;">🌀 {s['name']}</span>
-        <span style="color:#a8c4e0;font-size:13px;margin-left:10px;">{s['feed']}</span>
-      </div>
-      <div style="background:white;padding:0;">
-        <table style="width:100%;border-collapse:collapse;">
-          <tr>
-            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Latest Advisory</td>
-            <td style="padding:5px 10px;font-size:13px;">{s['latest_title']}</td>
-          </tr>
-          <tr style="background:#f9f9f9;">
-            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Published</td>
-            <td style="padding:5px 10px;font-size:13px;">{to_et(s['latest_published'])}</td>
-          </tr>
-          {wind_row}
-          {loc_row}
-          <tr>
-            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Warnings</td>
-            <td style="padding:8px 10px;">{warning_html}</td>
-          </tr>
-          <tr style="background:#f9f9f9;">
-            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Watches</td>
-            <td style="padding:8px 10px;">{watch_html}</td>
-          </tr>
-          <tr>
-            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Status</td>
-            <td style="padding:8px 10px;">{flag_html}</td>
-          </tr>
-          <tr style="background:#f0f4f8;">
-            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Summary</td>
-            <td style="padding:8px 10px;font-size:13px;border-left:3px solid {border_color};">{s['latest_summary']}</td>
-          </tr>
-          <tr>
-            <td colspan="2" style="padding:10px 16px;text-align:right;">
-              <a href="{s['link']}" style="background:#1a3a5c;color:white;padding:7px 16px;border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold;">View Full Advisory →</a>
-            </td>
-          </tr>
-        </table>
-      </div>
-    </div>
-    """
+    storm_blocks += (
+        '<div style="border-left:5px solid ' + border_color + ';border-radius:6px;margin-bottom:18px;'
+        'overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">'
+        '<div style="background:#1a3a5c;padding:12px 16px;">'
+        '<span style="color:white;font-size:16px;font-weight:bold;">&#127744; ' + s["name"] + '</span>'
+        '<span style="color:#a8c4e0;font-size:13px;margin-left:10px;">' + s["feed"] + '</span>'
+        '</div>'
+        '<div style="background:white;padding:0;">'
+        '<table style="width:100%;border-collapse:collapse;">'
+        '<tr><td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Latest Advisory</td>'
+        '<td style="padding:5px 10px;font-size:13px;">' + s["latest_title"] + '</td></tr>'
+        '<tr style="background:#f9f9f9;"><td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Published</td>'
+        '<td style="padding:5px 10px;font-size:13px;">' + to_et(s["latest_published"]) + '</td></tr>'
+        + wind_row + loc_row +
+        '<tr><td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Warnings</td>'
+        '<td style="padding:8px 10px;">' + warning_pills + '</td></tr>'
+        '<tr style="background:#f9f9f9;"><td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Watches</td>'
+        '<td style="padding:8px 10px;">' + watch_pills + '</td></tr>'
+        '<tr><td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Status</td>'
+        '<td style="padding:8px 10px;">' + flag_html + '</td></tr>'
+        '<tr style="background:#f0f4f8;"><td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Summary</td>'
+        '<td style="padding:8px 10px;font-size:13px;border-left:3px solid ' + border_color + ';">' + s["latest_summary"] + '</td></tr>'
+        '<tr><td colspan="2" style="padding:10px 16px;text-align:right;">'
+        '<a href="' + s["link"] + '" style="background:#1a3a5c;color:white;padding:7px 16px;border-radius:4px;'
+        'text-decoration:none;font-size:13px;font-weight:bold;">View Full Advisory &#8594;</a>'
+        '</td></tr>'
+        '</table></div></div>'
+    )
 
+# New advisory rows
 new_rows = ""
 for e in new_entries:
-    new_rows += f"""
-    <tr><td colspan="2" style="padding:10px 12px;background:#1a5276;color:white;font-weight:bold;">{e['feed']}</td></tr>
-    <tr><td style="padding:6px 12px;font-weight:bold;width:110px;">Advisory</td>
-      <td style="padding:6px 12px;">
-        <span style="background:#e74c3c;color:white;font-size:11px;font-weight:bold;padding:2px 6px;border-radius:3px;margin-right:6px;">&#x1F195; NEW</span>
-        {e['title']}
-      </td>
-    </tr>
-    <tr style="background:#f2f3f4;"><td style="padding:6px 12px;font-weight:bold;">Published</td><td style="padding:6px 12px;">{to_et(e['published'])}</td></tr>
-    <tr><td style="padding:6px 12px;font-weight:bold;vertical-align:top;">Summary</td><td style="padding:6px 12px;background:#eaf4fb;border-left:4px solid #1a5276;">{e['summary'][:400]}</td></tr>
-    <tr><td></td><td style="padding:6px 12px;"><a href="{e['link']}" style="color:#1a5276;">View full advisory &#x2192;</a></td></tr>
-    """
+    new_rows += (
+        '<tr><td colspan="2" style="padding:10px 12px;background:#1a5276;color:white;font-weight:bold;">'
+        + e["feed"] + '</td></tr>'
+        '<tr><td style="padding:6px 12px;font-weight:bold;width:110px;">Advisory</td>'
+        '<td style="padding:6px 12px;">'
+        '<span style="background:#c0392b;color:white;font-size:12px;font-weight:bold;padding:3px 8px;'
+        'border-radius:3px;margin-right:6px;letter-spacing:1px;">&#x1F195; NEW</span>'
+        + e["title"] + '</td></tr>'
+        '<tr style="background:#f2f3f4;"><td style="padding:6px 12px;font-weight:bold;">Published</td>'
+        '<td style="padding:6px 12px;">' + to_et(e["published"]) + '</td></tr>'
+        '<tr><td style="padding:6px 12px;font-weight:bold;vertical-align:top;">Summary</td>'
+        '<td style="padding:6px 12px;background:#eaf4fb;border-left:4px solid #1a5276;">'
+        + e["summary"][:400] + '</td></tr>'
+        '<tr><td></td><td style="padding:6px 12px;">'
+        '<a href="' + e["link"] + '" style="color:#1a5276;font-weight:bold;">View full advisory &#8594;</a>'
+        '</td></tr>'
+    )
 
-subject = f"🌀 NHC Alert: {len(new_entries)} New Advisory{'s' if len(new_entries) > 1 else ''}"
-
-html_body = f"""
+html_body = """
 <html>
+<head>
+<style>
+@keyframes flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.flash-badge {
+  animation: flash 1s infinite;
+  display: inline-block;
+}
+</style>
+</head>
 <body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;color:#222;">
   <div style="max-width:680px;margin:0 auto;padding:20px 0;">
 
-    <!-- NOAA-style banner -->
-    <div style="background:#1a3a5c;border-radius:6px 6px 0 0;padding:18px 24px;display:flex;align-items:center;">
-      <div>
-        <div style="color:#a8c4e0;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">National Hurricane Center</div>
-        <div style="color:white;font-size:22px;font-weight:bold;letter-spacing:1px;">⛈️ NHC ADVISORY ALERT</div>
-        <div style="color:#a8c4e0;font-size:12px;margin-top:4px;">{now_str} &nbsp;|&nbsp; {len(new_entries)} new update(s)</div>
+    <!-- Severity banner -->
+    <div style="background:""" + banner_bg + """;border-radius:6px 6px 0 0;padding:20px 24px;text-align:center;">
+      <div style="color:white;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;opacity:0.85;">
+        National Hurricane Center — """ + banner_label + """
+      </div>
+      <div style="color:white;font-size:24px;font-weight:bold;letter-spacing:1px;">
+        """ + banner_emoji + """
+      </div>
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:6px;">
+        """ + now_str + """ &nbsp;|&nbsp; """ + str(len(new_entries)) + """ new update(s)
+      </div>
+    </div>
+
+    <!-- Top alert box -->
+    <div style="background:""" + banner_bg + """;padding:16px 24px;border-top:1px solid rgba(255,255,255,0.2);">
+      <div style="color:white;font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;opacity:0.85;">
+        Active Storms
+      </div>
+      """ + alert_box_rows + """
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.3);text-align:center;">
+        <a href="https://www.nhc.noaa.gov" style="color:white;font-size:14px;font-weight:bold;
+           background:rgba(255,255,255,0.2);padding:8px 20px;border-radius:4px;text-decoration:none;
+           display:inline-block;border:1px solid rgba(255,255,255,0.5);">
+          &#9888; CHECK NHC.NOAA.GOV FOR FULL DETAILS &#9888;
+        </a>
       </div>
     </div>
 
     <!-- Body -->
     <div style="background:white;padding:20px 24px;border-radius:0 0 6px 6px;">
 
-      <h3 style="color:#1a3a5c;margin:0 0 14px 0;font-size:15px;border-bottom:2px solid #e0e7ef;padding-bottom:8px;">📋 Active Storm Status</h3>
-      {storm_blocks if storm_blocks else '<p style="color:#888;font-size:13px;">No active storms currently tracked.</p>'}
+      <h3 style="color:#1a3a5c;margin:0 0 14px 0;font-size:15px;border-bottom:2px solid #e0e7ef;padding-bottom:8px;">
+        &#128203; Active Storm Status
+      </h3>
+      """ + (storm_blocks if storm_blocks else '<p style="color:#888;font-size:13px;">No active storms currently tracked.</p>') + """
 
-      <h3 style="color:#1a3a5c;margin:20px 0 14px 0;font-size:15px;border-bottom:2px solid #e0e7ef;padding-bottom:8px;">🆕 New Advisories This Check</h3>
-      <table style="border-collapse:collapse;width:100%;">{new_rows}</table>
+      <h3 style="color:#1a3a5c;margin:20px 0 14px 0;font-size:15px;border-bottom:2px solid #e0e7ef;padding-bottom:8px;">
+        <span class="flash-badge" style="background:#c0392b;color:white;font-size:12px;font-weight:bold;
+          padding:3px 8px;border-radius:3px;margin-right:8px;letter-spacing:1px;">&#x1F195; NEW</span>
+        New Advisories This Check
+      </h3>
+      <table style="border-collapse:collapse;width:100%;">""" + new_rows + """</table>
 
     </div>
 
-    <p style="text-align:center;font-size:11px;color:#aaa;margin-top:12px;">
-      Auto-generated NHC monitor &nbsp;•&nbsp; Checks every 15 minutes &nbsp;•&nbsp; nhc.noaa.gov
+    <!-- Footer -->
+    <p style="text-align:center;font-size:12px;color:#c0392b;font-weight:bold;margin-top:14px;">
+      This is an automated OIC weather alert. Check
+      <a href="https://www.nhc.noaa.gov" style="color:#c0392b;">nhc.noaa.gov</a>
+      for the latest information.
     </p>
+    <p style="text-align:center;font-size:11px;color:#aaa;margin-top:4px;">
+      Auto-generated NHC monitor &nbsp;•&nbsp; Checks every 15 minutes
+    </p>
+
   </div>
 </body>
 </html>
