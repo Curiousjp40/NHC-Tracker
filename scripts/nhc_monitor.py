@@ -17,6 +17,21 @@ def to_et(published_str):
     except Exception:
         return published_str
 
+def extract_wind_speed(text):
+    m = re.search(r'maximum sustained winds?.*?(\d+)\s*mph', text, re.IGNORECASE)
+    if m:
+        return f"{m.group(1)} mph"
+    m = re.search(r'(\d+)\s*mph.*?winds?', text, re.IGNORECASE)
+    if m:
+        return f"{m.group(1)} mph"
+    return None
+
+def extract_location(text):
+    m = re.search(r'located.*?near\s+([\d.]+)[°\s]*([NS]).*?([\d.]+)[°\s]*([EW])', text, re.IGNORECASE)
+    if m:
+        return f"{m.group(1)}°{m.group(2)}, {m.group(3)}°{m.group(4)}"
+    return None
+
 FEEDS = {
     "Atlantic Basin":  "https://www.nhc.noaa.gov/index-at.xml",
     "Eastern Pacific": "https://www.nhc.noaa.gov/index-ep.xml",
@@ -132,63 +147,157 @@ def get_storm_status(entries):
         if "...hurricane watch in effect" in text or "hurricane watch is in effect" in text:
             storms[name]["watches"].append("Hurricane Watch")
         if "made landfall" in text or "center made landfall" in text:
-            storms[name]["status_flags"].append("✅ Landfall confirmed by NHC")
+            storms[name]["status_flags"].append("Landfall confirmed by NHC")
         if "discontinu" in text and "advisory" in text:
-            storms[name]["status_flags"].append("🏁 NHC discontinuing advisories")
+            storms[name]["status_flags"].append("NHC discontinuing advisories")
         if "is forecast to strengthen" in text or "expected to intensify" in text:
-            storms[name]["status_flags"].append("📈 Strengthening forecast")
+            storms[name]["status_flags"].append("Strengthening forecast")
         if "is forecast to weaken" in text or "expected to weaken" in text:
-            storms[name]["status_flags"].append("📉 Weakening forecast")
+            storms[name]["status_flags"].append("Weakening forecast")
     return storms
 
 storms = get_storm_status(all_entries)
 
+now_et = datetime.datetime.now(ZoneInfo("America/New_York"))
+now_suffix = "EDT" if now_et.dst() else "EST"
+now_str = now_et.strftime(f"%b %d, %Y %I:%M %p {now_suffix}")
+
 storm_blocks = ""
 for name, s in storms.items():
-    watches = list(dict.fromkeys(s["watches"]))
+    watches  = list(dict.fromkeys(s["watches"]))
     warnings = list(dict.fromkeys(s["warnings"]))
-    flags = list(dict.fromkeys(s["status_flags"]))
-    watch_html = "".join(f"<li>⚠️ {w}</li>" for w in watches) if watches else "<li>None</li>"
-    warning_html = "".join(f"<li>🔴 {w}</li>" for w in warnings) if warnings else "<li>None</li>"
-    flag_html = "".join(f"<li>✅ {f}</li>" for f in flags) if flags else "<li>No significant status changes</li>"
+    flags    = list(dict.fromkeys(s["status_flags"]))
+
+    wind  = extract_wind_speed(s["latest_summary"])
+    loc   = extract_location(s["latest_summary"])
+
+    # Card border color
+    if warnings:
+        border_color = "#c0392b"
+    elif watches:
+        border_color = "#e67e22"
+    else:
+        border_color = "#7f8c8d"
+
+    # Watches/warnings HTML
+    def alert_pills(items, bg, color):
+        if not items:
+            return '<span style="color:#888;font-size:13px;">None</span>'
+        return "".join(
+            f'<span style="background:{bg};color:{color};padding:3px 8px;border-radius:3px;font-size:13px;margin-right:4px;">{i}</span>'
+            for i in items
+        )
+
+    warning_html = alert_pills(warnings, "#fde8e8", "#c0392b")
+    watch_html   = alert_pills(watches,  "#fff3e0", "#e67e22")
+
+    if flags:
+        flag_html = "".join(
+            f'<div style="background:#e8f5e9;color:#2e7d32;padding:4px 8px;border-radius:3px;font-size:13px;margin-bottom:3px;">{f}</div>'
+            for f in flags
+        )
+    else:
+        flag_html = '<span style="color:#888;font-size:13px;">No significant status changes</span>'
+
+    wind_row = f"""
+        <tr>
+          <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Wind Speed</td>
+          <td style="padding:5px 10px;font-size:13px;">{wind}</td>
+        </tr>""" if wind else ""
+
+    loc_row = f"""
+        <tr style="background:#f9f9f9;">
+          <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Location</td>
+          <td style="padding:5px 10px;font-size:13px;">{loc}</td>
+        </tr>""" if loc else ""
+
     storm_blocks += f"""
-    <div style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:6px;padding:15px;margin-bottom:15px;">
-      <h3 style="color:#1a5276;margin:0 0 10px 0;">🌀 {s['name']} — {s['feed']}</h3>
-      <table style="width:100%;border-collapse:collapse;">
-        <tr><td style="padding:4px 8px;font-weight:bold;width:140px;vertical-align:top;">Latest Advisory</td><td style="padding:4px 8px;">{s['latest_title']}</td></tr>
-        <tr style="background:#eaf4fb;"><td style="padding:4px 8px;font-weight:bold;">Published</td><td style="padding:4px 8px;">{to_et(s['latest_published'])}</td></tr>
-        <tr><td style="padding:4px 8px;font-weight:bold;vertical-align:top;">Watches</td><td style="padding:4px 8px;"><ul style="margin:0;padding-left:18px;">{watch_html}</ul></td></tr>
-        <tr style="background:#eaf4fb;"><td style="padding:4px 8px;font-weight:bold;vertical-align:top;">Warnings</td><td style="padding:4px 8px;"><ul style="margin:0;padding-left:18px;">{warning_html}</ul></td></tr>
-        <tr><td style="padding:4px 8px;font-weight:bold;vertical-align:top;">Status</td><td style="padding:4px 8px;"><ul style="margin:0;padding-left:18px;">{flag_html}</ul></td></tr>
-        <tr style="background:#eaf4fb;"><td style="padding:4px 8px;font-weight:bold;vertical-align:top;">Summary</td><td style="padding:4px 8px;border-left:4px solid #1a5276;">{s['latest_summary']}</td></tr>
-        <tr><td></td><td style="padding:4px 8px;"><a href="{s['link']}" style="color:#1a5276;">View full advisory →</a></td></tr>
-      </table>
+    <div style="border-left:5px solid {border_color};border-radius:6px;margin-bottom:18px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+      <div style="background:#1a3a5c;padding:12px 16px;">
+        <span style="color:white;font-size:16px;font-weight:bold;">🌀 {s['name']}</span>
+        <span style="color:#a8c4e0;font-size:13px;margin-left:10px;">{s['feed']}</span>
+      </div>
+      <div style="background:white;padding:0;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Latest Advisory</td>
+            <td style="padding:5px 10px;font-size:13px;">{s['latest_title']}</td>
+          </tr>
+          <tr style="background:#f9f9f9;">
+            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;">Published</td>
+            <td style="padding:5px 10px;font-size:13px;">{to_et(s['latest_published'])}</td>
+          </tr>
+          {wind_row}
+          {loc_row}
+          <tr{"" if wind or loc else " style=\"background:#f9f9f9;\""}>
+            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Warnings</td>
+            <td style="padding:8px 10px;">{warning_html}</td>
+          </tr>
+          <tr style="background:#f9f9f9;">
+            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Watches</td>
+            <td style="padding:8px 10px;">{watch_html}</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Status</td>
+            <td style="padding:8px 10px;">{flag_html}</td>
+          </tr>
+          <tr style="background:#f0f4f8;">
+            <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Summary</td>
+            <td style="padding:8px 10px;font-size:13px;border-left:3px solid {border_color};">{s['latest_summary']}</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:10px 16px;text-align:right;">
+              <a href="{s['link']}" style="background:#1a3a5c;color:white;padding:7px 16px;border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold;">View Full Advisory →</a>
+            </td>
+          </tr>
+        </table>
+      </div>
     </div>
     """
 
 new_rows = ""
 for e in new_entries:
     new_rows += f"""
-    <tr><td colspan="2" style="padding:10px 12px;background:#1a5276;color:white;font-weight:bold;">{e['feed']}</td></tr>
-    <tr><td style="padding:6px 12px;font-weight:bold;width:110px;">Advisory</td><td style="padding:6px 12px;">{e['title']}</td></tr>
-    <tr style="background:#f2f3f4;"><td style="padding:6px 12px;font-weight:bold;">Published</td><td style="padding:6px 12px;">{to_et(e['published'])}</td></tr>
-    <tr><td style="padding:6px 12px;font-weight:bold;vertical-align:top;">Summary</td><td style="padding:6px 12px;background:#eaf4fb;border-left:4px solid #1a5276;">{e['summary'][:400]}</td></tr>
-    <tr><td></td><td style="padding:6px 12px;"><a href="{e['link']}" style="color:#1a5276;">View full advisory →</a></td></tr>
+    <tr><td colspan="2" style="padding:10px 12px;background:#1a3a5c;color:white;font-weight:bold;">{e['feed']}</td></tr>
+    <tr><td style="padding:6px 12px;font-weight:bold;color:#555;width:110px;font-size:13px;">Advisory</td><td style="padding:6px 12px;font-size:13px;">{e['title']}</td></tr>
+    <tr style="background:#f9f9f9;"><td style="padding:6px 12px;font-weight:bold;color:#555;font-size:13px;">Published</td><td style="padding:6px 12px;font-size:13px;">{to_et(e['published'])}</td></tr>
+    <tr><td style="padding:6px 12px;font-weight:bold;color:#555;font-size:13px;vertical-align:top;">Summary</td><td style="padding:6px 12px;font-size:13px;border-left:3px solid #1a3a5c;background:#f0f4f8;">{e['summary'][:400]}</td></tr>
+    <tr><td colspan="2" style="padding:8px 16px;text-align:right;"><a href="{e['link']}" style="background:#1a3a5c;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold;">View Full Advisory →</a></td></tr>
     """
 
 subject = f"🌀 NHC Alert: {len(new_entries)} New Advisory{'s' if len(new_entries) > 1 else ''}"
 
 html_body = f"""
-<html><body style="font-family:Arial,sans-serif;color:#222;max-width:680px;">
-  <h2 style="color:#1a5276;border-bottom:2px solid #1a5276;padding-bottom:6px;">⛈️ NHC Advisory Alert</h2>
-  <p style="color:#555;">{len(new_entries)} new update(s) posted to nhc.noaa.gov</p>
-  <h3 style="color:#1a5276;margin-top:20px;">📋 Active Storm Status</h3>
-  {storm_blocks if storm_blocks else '<p style="color:#888;">No active storms currently tracked.</p>'}
-  <h3 style="color:#1a5276;margin-top:20px;">🆕 New Advisories This Check</h3>
-  <table style="border-collapse:collapse;width:100%;">{new_rows}</table>
-  <hr style="border:none;border-top:1px solid #ddd;margin-top:20px;">
-  <p style="font-size:11px;color:#888;">Auto-generated NHC monitor • Checks every 15 minutes</p>
-</body></html>
+<html>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;color:#222;">
+  <div style="max-width:680px;margin:0 auto;padding:20px 0;">
+
+    <!-- NOAA-style banner -->
+    <div style="background:#1a3a5c;border-radius:6px 6px 0 0;padding:18px 24px;display:flex;align-items:center;">
+      <div>
+        <div style="color:#a8c4e0;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">National Hurricane Center</div>
+        <div style="color:white;font-size:22px;font-weight:bold;letter-spacing:1px;">⛈️ NHC ADVISORY ALERT</div>
+        <div style="color:#a8c4e0;font-size:12px;margin-top:4px;">{now_str} &nbsp;|&nbsp; {len(new_entries)} new update(s)</div>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div style="background:white;padding:20px 24px;border-radius:0 0 6px 6px;">
+
+      <h3 style="color:#1a3a5c;margin:0 0 14px 0;font-size:15px;border-bottom:2px solid #e0e7ef;padding-bottom:8px;">📋 Active Storm Status</h3>
+      {storm_blocks if storm_blocks else '<p style="color:#888;font-size:13px;">No active storms currently tracked.</p>'}
+
+      <h3 style="color:#1a3a5c;margin:20px 0 14px 0;font-size:15px;border-bottom:2px solid #e0e7ef;padding-bottom:8px;">🆕 New Advisories This Check</h3>
+      <table style="border-collapse:collapse;width:100%;">{new_rows}</table>
+
+    </div>
+
+    <p style="text-align:center;font-size:11px;color:#aaa;margin-top:12px;">
+      Auto-generated NHC monitor &nbsp;•&nbsp; Checks every 15 minutes &nbsp;•&nbsp; nhc.noaa.gov
+    </p>
+  </div>
+</body>
+</html>
 """
 
 payload = json.dumps({
