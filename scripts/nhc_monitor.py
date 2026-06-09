@@ -71,28 +71,41 @@ if first_run:
     print("First run — seeded seen entries. Will email on next new advisory.")
     exit(0)
 
+# Only alert on the primary advisory products — not supplemental graphics/discussions
+CORE_ADVISORY_PATTERNS = [
+    r'public advisory',
+    r'forecast advisory',
+    r'special advisory',
+    r'intermediate advisory',
+    r'summary for tropical storm',
+    r'summary for hurricane',
+    r'tropical storm \w+ advisory number',
+    r'hurricane \w+ advisory number',
+]
+
 SKIP_KEYWORDS = [
     "no tropical cyclones at this time",
     "formation not expected",
     "there are no tropical",
     "tropical weather outlook",
     "graphical tropical weather",
-]
-
-TRIGGER_KEYWORDS = [
-    "tropical storm", "hurricane", "typhoon", "subtropical storm",
-    "watch", "warning", "landfall", "dissipat", "remnant",
-    "weakens", "strengthen", "intensif", "upgrade", "downgrade",
-    "state of emergency", "evacuation", "airport closure",
-    "discontinu", "public advisory", "forecast advisory",
-    "special advisory", "intermediate advisory",
+    "forecast discussion",
+    "wind speed probabilities",
+    "graphics",
+    "rainfall potential",
+    "arrival time",
+    "wind history",
+    "warnings and surface wind",
+    "key messages",
+    "rip currents",
+    "storm surge",
 ]
 
 def is_relevant(entry):
     text = (entry["title"] + " " + entry["summary"]).lower()
     if any(skip in text for skip in SKIP_KEYWORDS):
         return False
-    return any(trigger in text for trigger in TRIGGER_KEYWORDS)
+    return any(re.search(pattern, text) for pattern in CORE_ADVISORY_PATTERNS)
 
 print(f"DEBUG: {len(new_entries)} new (unseen) entries before filter")
 for e in new_entries:
