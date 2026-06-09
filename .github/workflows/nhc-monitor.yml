@@ -38,4 +38,4 @@ jobs:
           git reset --soft origin/main
           git add seen_entries.json
           git diff --cached --quiet || git commit -m "chore: update seen_entries.json [skip ci]"
-          git push origin main
+          git push --force origin main
