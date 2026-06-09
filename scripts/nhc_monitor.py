@@ -399,7 +399,7 @@ html_body = """
 
     <!-- Footer -->
     <p style="text-align:center;font-size:12px;color:#c0392b;font-weight:bold;margin-top:14px;">
-      This is an automated OIC weather alert. Check
+      This is an automated weather alert. Check
       <a href="https://www.nhc.noaa.gov" style="color:#c0392b;">nhc.noaa.gov</a>
       for the latest information.
     </p>
