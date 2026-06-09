@@ -27,7 +27,6 @@ api_key    = os.environ["SENDGRID_API_KEY"]
 from_email = os.environ["SMTP_USER"]
 to_email   = os.environ["TO_EMAIL"]
 
-# Load seen entries
 seen = set(json.loads(SEEN_FILE.read_text())) if SEEN_FILE.exists() else set()
 first_run = not SEEN_FILE.exists()
 
@@ -47,58 +46,29 @@ for feed_name, url in FEEDS.items():
             })
             seen.add(entry_id)
 
-# Always save seen entries
 SEEN_FILE.write_text(json.dumps(list(seen)))
 
-# On first run just seed — don't email
 if first_run:
     print("First run — seeded seen entries. Will email on next new advisory.")
     exit(0)
 
-# Only keep entries matching notification triggers
-TRIGGER_KEYWORDS = [
-    # Initial — storm named or watches/warnings
-    "tropical storm", "hurricane", "typhoon", "subtropical storm",
-    "watch", "warning",
-    # Updates
-    "upgrade", "downgrade", "landfall", "weakens", "dissipat", "remnant",
-    # Preparedness
-    "state of emergency", "evacuation", "airport closure",
-    # Final
-    "discontinu", "advisory number",
-]
-
+# Skip only truly empty no-activity entries
 SKIP_KEYWORDS = [
-    "tropical weather outlook",
-    "no tropical cyclones",
+    "no tropical cyclones at this time",
     "formation not expected",
-    "disturbance",
     "there are no tropical",
-    "not expected during the next",
 ]
 
 def is_relevant(entry):
     text = (entry["title"] + " " + entry["summary"]).lower()
     if any(skip in text for skip in SKIP_KEYWORDS):
         return False
-    return any(trigger in text for trigger in TRIGGER_KEYWORDS)
+    return True
 
-# Only keep entries published in the last 24 hours
-now = datetime.datetime.now(datetime.timezone.utc)
-cutoff = now - datetime.timedelta(hours=24)
-
-def is_recent(entry):
-    try:
-        dt = parsedate_to_datetime(entry["published"])
-        return dt > cutoff
-    except Exception:
-        return True  # If we can't parse the date, keep it
-
-new_entries = [e for e in new_entries if is_recent(e)]
 new_entries = [e for e in new_entries if is_relevant(e)]
 
 if not new_entries:
-    print("No relevant storm advisories.")
+    print("No new advisories.")
     exit(0)
 
 subject = f"🌀 NHC Alert: {len(new_entries)} New Advisory{'s' if len(new_entries) > 1 else ''}"
