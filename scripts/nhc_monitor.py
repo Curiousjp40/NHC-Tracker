@@ -82,6 +82,18 @@ def is_relevant(entry):
         return False
     return any(trigger in text for trigger in TRIGGER_KEYWORDS)
 
+# Only keep entries published in the last 24 hours
+now = datetime.datetime.now(datetime.timezone.utc)
+cutoff = now - datetime.timedelta(hours=24)
+
+def is_recent(entry):
+    try:
+        dt = parsedate_to_datetime(entry["published"])
+        return dt > cutoff
+    except Exception:
+        return True  # If we can't parse the date, keep it
+
+new_entries = [e for e in new_entries if is_recent(e)]
 new_entries = [e for e in new_entries if is_relevant(e)]
 
 if not new_entries:
