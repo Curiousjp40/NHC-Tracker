@@ -52,18 +52,28 @@ if first_run:
     print("First run — seeded seen entries. Will email on next new advisory.")
     exit(0)
 
-# Skip only truly empty no-activity entries
 SKIP_KEYWORDS = [
     "no tropical cyclones at this time",
     "formation not expected",
     "there are no tropical",
+    "tropical weather outlook",
+    "graphical tropical weather",
+]
+
+TRIGGER_KEYWORDS = [
+    "tropical storm", "hurricane", "typhoon", "subtropical storm",
+    "watch", "warning", "landfall", "dissipat", "remnant",
+    "weakens", "strengthen", "intensif", "upgrade", "downgrade",
+    "state of emergency", "evacuation", "airport closure",
+    "discontinu", "public advisory", "forecast advisory",
+    "special advisory", "intermediate advisory",
 ]
 
 def is_relevant(entry):
     text = (entry["title"] + " " + entry["summary"]).lower()
     if any(skip in text for skip in SKIP_KEYWORDS):
         return False
-    return True
+    return any(trigger in text for trigger in TRIGGER_KEYWORDS)
 
 new_entries = [e for e in new_entries if is_relevant(e)]
 
