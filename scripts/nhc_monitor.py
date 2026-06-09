@@ -4,14 +4,14 @@ import urllib.request
 import feedparser
 from pathlib import Path
 from email.utils import parsedate_to_datetime
-import datetime
+from zoneinfo import ZoneInfo
 
 def to_et(published_str):
     try:
         dt = parsedate_to_datetime(published_str)
-        et_offset = datetime.timezone(datetime.timedelta(hours=-4))  # EDT (UTC-4)
-        dt_et = dt.astimezone(et_offset)
-        return dt_et.strftime("%b %d, %Y %I:%M %p ET")
+        dt_et = dt.astimezone(ZoneInfo("America/New_York"))
+        suffix = "EDT" if dt_et.dst() else "EST"
+        return dt_et.strftime(f"%b %d, %Y %I:%M %p {suffix}")
     except Exception:
         return published_str
 
