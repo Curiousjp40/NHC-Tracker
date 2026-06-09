@@ -229,7 +229,7 @@ for name, s in storms.items():
           </tr>
           {wind_row}
           {loc_row}
-          <tr{"" if wind or loc else " style=\"background:#f9f9f9;\""}>
+          <tr>
             <td style="padding:5px 10px;color:#555;font-weight:bold;font-size:13px;white-space:nowrap;vertical-align:top;">Warnings</td>
             <td style="padding:8px 10px;">{warning_html}</td>
           </tr>
