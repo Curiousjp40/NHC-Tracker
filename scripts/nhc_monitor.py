@@ -3,6 +3,17 @@ import json
 import urllib.request
 import feedparser
 from pathlib import Path
+from email.utils import parsedate_to_datetime
+import datetime
+
+def to_et(published_str):
+    try:
+        dt = parsedate_to_datetime(published_str)
+        et_offset = datetime.timezone(datetime.timedelta(hours=-4))  # EDT (UTC-4)
+        dt_et = dt.astimezone(et_offset)
+        return dt_et.strftime("%b %d, %Y %I:%M %p ET")
+    except Exception:
+        return published_str
 
 FEEDS = {
     "Atlantic Basin":  "https://www.nhc.noaa.gov/index-at.xml",
@@ -89,7 +100,7 @@ for e in new_entries:
     </tr>
     <tr style="background:#f2f3f4;">
       <td style="padding:6px 12px;font-weight:bold;">Published</td>
-      <td style="padding:6px 12px;">{e['published']}</td>
+      <td style="padding:6px 12px;">{to_et(e['published'])}</td>
     </tr>
     <tr>
       <td style="padding:6px 12px;font-weight:bold;vertical-align:top;">Summary</td>
