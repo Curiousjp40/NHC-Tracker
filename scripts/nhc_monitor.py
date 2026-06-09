@@ -111,8 +111,8 @@ print(f"DEBUG: {len(new_entries)} new (unseen) entries before filter")
 for e in new_entries:
     text = (e["title"] + " " + e["summary"]).lower()
     skipped = any(s in text for s in SKIP_KEYWORDS)
-    triggered = any(t in text for t in TRIGGER_KEYWORDS)
-    print(f"  [{'SKIP' if skipped else ('PASS' if triggered else 'MISS')}] {e['title']}")
+    matched = any(re.search(p, text) for p in CORE_ADVISORY_PATTERNS)
+    print(f"  [{'SKIP' if skipped else ('PASS' if matched else 'MISS')}] {e['title']}")
 
 new_entries = [e for e in new_entries if is_relevant(e)]
 
