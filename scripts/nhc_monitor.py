@@ -23,11 +23,9 @@ if TEST_MODE:
     }]
 
 FEEDS = {
-    "Atlantic Basin":       "https://www.nhc.noaa.gov/index-at.xml",
-    "Eastern Pacific":      "https://www.nhc.noaa.gov/index-ep.xml",
-    "Central Pacific":      "https://www.nhc.noaa.gov/index-cp.xml",
-    "Atlantic Outlook":     "https://www.nhc.noaa.gov/xml/TWOAT.xml",
-    "East Pacific Outlook": "https://www.nhc.noaa.gov/xml/TWOEP.xml",
+    "Atlantic Basin":  "https://www.nhc.noaa.gov/index-at.xml",
+    "Eastern Pacific": "https://www.nhc.noaa.gov/index-ep.xml",
+    "Central Pacific": "https://www.nhc.noaa.gov/index-cp.xml",
 }
 
 SEEN_FILE  = Path("seen_entries.json")
@@ -59,8 +57,18 @@ if not TEST_MODE:
 
     SEEN_FILE.write_text(json.dumps(list(seen)))
 
+# Filter out routine outlook entries — only keep actual storm advisories
+new_entries = [
+    e for e in new_entries
+    if not any(skip in e["title"].lower() for skip in [
+        "tropical weather outlook",
+        "no tropical cyclones",
+        "formation not expected",
+    ])
+]
+
 if not new_entries:
-    print("No new NHC advisories.")
+    print("No new storm advisories.")
     exit(0)
 
 subject = f"🌀 NHC Alert: {len(new_entries)} New Advisory{'s' if len(new_entries) > 1 else ''}"
